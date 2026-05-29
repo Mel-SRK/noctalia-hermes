@@ -56,6 +56,9 @@ Item {
   readonly property string displayText: {
     if (status === "attention") return "!";
     if (status === "degraded") return "!";
+    // Conversation ended / idle: keep the green status icon, but hide stale
+    // token usage from the previous turn/session.
+    if (status === "idle") return "";
     return root.usageText;
   }
 
