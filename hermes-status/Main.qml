@@ -29,8 +29,10 @@ Item {
     property bool needsAttention: false
     property int activeAgents: 0
     property var platforms: ({})
-    property string fetchState: "idle"
-    property string errorMessage: ""
+   property string fetchState: "idle"
+   property string errorMessage: ""
+    property string signalEvent: ""
+    property string signalTs: ""
 
     property bool hasError: {
       for (var key in platforms) {
@@ -83,6 +85,8 @@ Item {
         hermesService.needsAttention = data.needs_attention || false;
         hermesService.activeAgents = data.active_agents || 0;
         hermesService.platforms = data.platforms || {};
+        hermesService.signalEvent = data.signal_event || "";
+        hermesService.signalTs = data.signal_ts || "";
         hermesService.fetchState = "success";
         hermesService.errorMessage = "";
       } catch (e) {
