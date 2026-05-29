@@ -13,6 +13,7 @@ Item {
   property ShellScreen screen
   readonly property var geometryPlaceholder: panelContainer
   property real contentPreferredWidth: 240 * Style.uiScaleRatio
+  property real contentPreferredHeight: 140 * Style.uiScaleRatio
   readonly property bool allowAttach: true
 
   readonly property string status: hermesService?.status ?? "unknown"
