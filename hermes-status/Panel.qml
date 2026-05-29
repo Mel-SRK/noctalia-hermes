@@ -12,25 +12,20 @@ Item {
 
   property ShellScreen screen
   readonly property var geometryPlaceholder: panelContainer
-  property real contentPreferredWidth: 280 * Style.uiScaleRatio
+  property real contentPreferredWidth: 240 * Style.uiScaleRatio
   readonly property bool allowAttach: true
 
   readonly property string status: hermesService?.status ?? "unknown"
   readonly property bool cliActive: hermesService?.cliActive ?? false
-  readonly property string cliPid: hermesService?.cliPid ?? ""
   readonly property string gatewayPid: hermesService?.gatewayPid ?? ""
-  readonly property var platforms: hermesService?.platforms ?? ({})
-  readonly property int activeAgents: hermesService?.activeAgents ?? 0
-  readonly property bool needsAttention: hermesService?.needsAttention ?? false
-  readonly property string fetchState: hermesService?.fetchState ?? "idle"
   readonly property string signalEvent: hermesService?.signalEvent ?? ""
-  readonly property string signalTs: hermesService?.signalTs ?? ""
+  readonly property var platforms: hermesService?.platforms ?? ({})
 
   readonly property string statusText: {
     switch (status) {
       case "offline":    return "Offline";
       case "idle":       return "Online";
-      case "busy":       return "Working...";
+      case "busy":       return "Working";
       case "attention":  return "Needs You";
       case "degraded":   return "Degraded";
       case "error":      return "Error";
@@ -62,20 +57,17 @@ Item {
     }
   }
 
-  readonly property string lastEventText: {
-    if (!signalEvent) return "";
+  readonly property string eventText: {
     var map = {
-      "pre_llm_call": "Thinking...",
-      "post_llm_call": "Processing response",
-      "pre_tool_call": "Running tool",
-      "post_tool_call": "Tool finished",
-      "pre_approval_request": "Waiting for approval",
-      "post_approval_response": "Continuing",
-      "on_session_start": "Session started",
-      "on_session_end": "Session ended",
-      "on_session_finalize": "Session finalized"
+      "pre_llm_call": "Thinking",
+      "post_llm_call": "Processing",
+      "pre_tool_call": "Tool call",
+      "post_tool_call": "Tool done",
+      "pre_approval_request": "Awaiting approval",
+      "on_session_start": "Started",
+      "on_session_end": "Ended"
     };
-    return map[signalEvent] || signalEvent;
+    return map[signalEvent] || "";
   }
 
   Rectangle {
@@ -83,191 +75,123 @@ Item {
     anchors.fill: parent
     color: "transparent"
 
-    ColumnLayout {
+    NBox {
       anchors.fill: parent
-      anchors.margins: Style.marginM
-      spacing: Style.marginS
+      anchors.margins: Style.marginS
 
-      // ── Status header card ──
-      NBox {
-        Layout.fillWidth: true
-        Layout.preferredHeight: statusRow.implicitHeight + Style.marginM * 2
+      ColumnLayout {
+        anchors.fill: parent
+        anchors.margins: Style.marginM
+        spacing: 4
 
+        // Row 1: icon + name + status
         RowLayout {
-          id: statusRow
-          anchors.fill: parent
-          anchors.margins: Style.marginM
           spacing: Style.marginS
 
           NIcon {
             icon: root.statusIcon
             color: root.statusColor
-            pointSize: Style.fontSizeXL
+            pointSize: Style.fontSizeM
           }
-
-          ColumnLayout {
-            Layout.fillWidth: true
-            spacing: 2
-
-            NText {
-              text: "Hermes Agent"
-              font.weight: Font.Bold
-              pointSize: Style.fontSizeM
-              color: Color.mOnSurface
-            }
-
-            NText {
-              text: root.statusText
-              pointSize: Style.fontSizeS
-              color: root.statusColor
-              font.weight: Font.DemiBold
-            }
-          }
-        }
-      }
-
-      // ── Info rows ──
-      NBox {
-        Layout.fillWidth: true
-        Layout.preferredHeight: infoCol.implicitHeight + Style.marginM * 2
-
-        ColumnLayout {
-          id: infoCol
-          anchors.fill: parent
-          anchors.margins: Style.marginM
-          spacing: Style.marginXS
-
-          // Gateway
-          RowLayout {
-            Layout.fillWidth: true
-            spacing: Style.marginS
-
-            NIcon { icon: "server"; pointSize: Style.fontSizeS; color: Color.mOnSurface; opacity: 0.5 }
-
-            NText {
-              text: "Gateway"
-              pointSize: Style.fontSizeS
-              color: Color.mOnSurface
-              opacity: 0.6
-              Layout.preferredWidth: 70
-            }
-
-            NText {
-              text: gatewayPid ? "PID " + gatewayPid : "Stopped"
-              pointSize: Style.fontSizeS
-              color: gatewayPid ? Color.mOnSurface : Color.mError
-              Layout.fillWidth: true
-            }
-          }
-
-          // CLI Session
-          RowLayout {
-            Layout.fillWidth: true
-            spacing: Style.marginS
-
-            NIcon { icon: "terminal"; pointSize: Style.fontSizeS; color: Color.mOnSurface; opacity: 0.5 }
-
-            NText {
-              text: "Session"
-              pointSize: Style.fontSizeS
-              color: Color.mOnSurface
-              opacity: 0.6
-              Layout.preferredWidth: 70
-            }
-
-            NText {
-              text: cliActive ? (lastEventText || "Active") : "None"
-              pointSize: Style.fontSizeS
-              color: cliActive ? Color.mOnSurface : Color.mOnSurface
-              opacity: cliActive ? 1.0 : 0.4
-              Layout.fillWidth: true
-            }
-          }
-
-          // Last event timestamp (when busy)
-          RowLayout {
-            Layout.fillWidth: true
-            visible: signalTs !== ""
-            spacing: Style.marginS
-
-            NIcon { icon: "clock"; pointSize: Style.fontSizeS; color: Color.mOnSurface; opacity: 0.5 }
-
-            NText {
-              text: "Updated"
-              pointSize: Style.fontSizeS
-              color: Color.mOnSurface
-              opacity: 0.6
-              Layout.preferredWidth: 70
-            }
-
-            NText {
-              text: {
-                if (!signalTs) return "";
-                var d = new Date(signalTs);
-                return Qt.formatTime(d, "hh:mm:ss");
-              }
-              pointSize: Style.fontSizeS
-              color: Color.mOnSurface
-              Layout.fillWidth: true
-            }
-          }
-        }
-      }
-
-      // ── Platforms ──
-      NBox {
-        Layout.fillWidth: true
-        visible: Object.keys(root.platforms).length > 0
-        Layout.preferredHeight: platCol.implicitHeight + Style.marginM * 2
-
-        ColumnLayout {
-          id: platCol
-          anchors.fill: parent
-          anchors.margins: Style.marginM
-          spacing: Style.marginXS
 
           NText {
-            text: "Platforms"
+            text: "Hermes"
+            font.weight: Font.Bold
             pointSize: Style.fontSizeS
-            font.weight: Font.DemiBold
             color: Color.mOnSurface
-            opacity: 0.6
           }
 
-          Repeater {
-            model: {
-              var items = [];
-              for (var key in root.platforms) {
-                var p = root.platforms[key];
-                items.push({
-                  "name": key.charAt(0).toUpperCase() + key.slice(1),
-                  "state": p.state || "unknown"
-                });
-              }
-              return items;
+          NText {
+            text: root.statusText
+            pointSize: Style.fontSizeS
+            color: root.statusColor
+          }
+
+          Item { Layout.fillWidth: true }
+
+          NText {
+            text: root.eventText
+            pointSize: Style.fontSizeS
+            color: Color.mOnSurface
+            opacity: 0.5
+            visible: text !== ""
+          }
+        }
+
+        // Separator
+        Rectangle {
+          Layout.fillWidth: true
+          Layout.preferredHeight: 1
+          color: Color.mOutline
+          opacity: 0.2
+        }
+
+        // Row 2: Gateway
+        RowLayout {
+          spacing: Style.marginS
+
+          NText {
+            text: "Gateway"
+            pointSize: Style.fontSizeS
+            color: Color.mOnSurface
+            opacity: 0.5
+            Layout.preferredWidth: 60
+          }
+
+          NText {
+            text: gatewayPid ? "PID " + gatewayPid : "Stopped"
+            pointSize: Style.fontSizeS
+            color: gatewayPid ? Color.mOnSurface : Color.mError
+          }
+        }
+
+        // Row 3: Session
+        RowLayout {
+          spacing: Style.marginS
+
+          NText {
+            text: "Session"
+            pointSize: Style.fontSizeS
+            color: Color.mOnSurface
+            opacity: 0.5
+            Layout.preferredWidth: 60
+          }
+
+          NText {
+            text: cliActive ? "Active" : "None"
+            pointSize: Style.fontSizeS
+            opacity: cliActive ? 1.0 : 0.4
+          }
+        }
+
+        // Row 4+: Platforms
+        Repeater {
+          model: {
+            var items = [];
+            for (var key in root.platforms) {
+              items.push({
+                "name": key.charAt(0).toUpperCase() + key.slice(1),
+                "ok": root.platforms[key]?.state === "connected"
+              });
+            }
+            return items;
+          }
+
+          delegate: RowLayout {
+            spacing: Style.marginS
+
+            NText {
+              text: modelData.name
+              pointSize: Style.fontSizeS
+              color: Color.mOnSurface
+              opacity: 0.5
+              Layout.preferredWidth: 60
             }
 
-            delegate: RowLayout {
-              Layout.fillWidth: true
-              spacing: Style.marginS
-
-              Rectangle {
-                width: 8; height: 8; radius: 4
-                color: modelData.state === "connected" ? Color.mPrimary : Color.mError
-              }
-
-              NText {
-                text: modelData.name
-                pointSize: Style.fontSizeS
-                color: Color.mOnSurface
-                Layout.fillWidth: true
-              }
-
-              NText {
-                text: modelData.state === "connected" ? "✓" : "✗"
-                pointSize: Style.fontSizeS
-                color: modelData.state === "connected" ? Color.mPrimary : Color.mError
-              }
+            NText {
+              text: modelData.ok ? "Online" : "Offline"
+              pointSize: Style.fontSizeS
+              color: modelData.ok ? Color.mPrimary : Color.mError
             }
           }
         }
