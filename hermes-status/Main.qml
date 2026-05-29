@@ -31,6 +31,7 @@ Item {
     property string errorMessage: ""
     property string signalEvent: ""
     property string signalTs: ""
+    property var usage: ({})
 
     property bool hasError: {
       for (var key in platforms) {
@@ -122,6 +123,7 @@ Item {
         hermesService.platforms = data.platforms || {};
         hermesService.signalEvent = data.signal_event || "";
         hermesService.signalTs = data.signal_ts || "";
+        hermesService.usage = data.usage || {};
         hermesService.fetchState = "success";
         hermesService.errorMessage = "";
       } catch (e) {

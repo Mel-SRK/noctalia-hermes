@@ -13,7 +13,7 @@ Item {
   property ShellScreen screen
   readonly property var geometryPlaceholder: panelContainer
   property real contentPreferredWidth: 240 * Style.uiScaleRatio
-  property real contentPreferredHeight: 110 * Style.uiScaleRatio
+  property real contentPreferredHeight: 150 * Style.uiScaleRatio
   readonly property bool allowAttach: true
 
   readonly property string status: hermesService?.status ?? "unknown"
@@ -21,6 +21,7 @@ Item {
   readonly property string gatewayPid: hermesService?.gatewayPid ?? ""
   readonly property string signalEvent: hermesService?.signalEvent ?? ""
   readonly property var platforms: hermesService?.platforms ?? ({})
+  readonly property var usage: hermesService?.usage ?? ({})
 
   readonly property string statusText: {
     switch (status) {
@@ -69,6 +70,39 @@ Item {
       "on_session_end": "Ended"
     };
     return map[signalEvent] || "";
+  }
+
+  function formatTokens(value) {
+    var n = Number(value || 0);
+    if (n >= 1000000) return (n / 1000000).toFixed(n >= 10000000 ? 0 : 1) + "M";
+    if (n >= 1000) return (n / 1000).toFixed(n >= 100000 ? 0 : 1) + "k";
+    return String(Math.round(n));
+  }
+
+  function formatCost(value) {
+    if (value === undefined || value === null) return "unknown";
+    var n = Number(value);
+    if (!isFinite(n) || n <= 0) return "unknown";
+    if (n < 0.0001) return "$" + n.toFixed(6);
+    if (n < 0.01) return "$" + n.toFixed(4);
+    return "$" + n.toFixed(2);
+  }
+
+  readonly property string tokensText: {
+    if (!usage || !usage.available) return "None";
+    return formatTokens(usage.total_tokens)
+      + "  in " + formatTokens(usage.input_tokens)
+      + " / out " + formatTokens(usage.output_tokens)
+      + " / cache " + formatTokens(usage.cache_tokens);
+  }
+
+  readonly property string costText: {
+    if (!usage || !usage.available) return "unknown";
+    var actual = formatCost(usage.actual_cost_usd);
+    if (actual !== "unknown") return actual + " actual";
+    var estimated = formatCost(usage.estimated_cost_usd);
+    if (estimated !== "unknown") return estimated + " estimated";
+    return "unknown";
   }
 
   Rectangle {
@@ -165,7 +199,49 @@ Item {
           }
         }
 
-        // Row 4+: Platforms
+
+        // Row 4: Tokens
+        RowLayout {
+          spacing: Style.marginS
+
+          NText {
+            text: "Tokens"
+            pointSize: Style.fontSizeS
+            color: Color.mOnSurface
+            opacity: 0.5
+            Layout.preferredWidth: 60
+          }
+
+          NText {
+            text: root.tokensText
+            pointSize: Style.fontSizeS
+            color: Color.mOnSurface
+            Layout.fillWidth: true
+            elide: Text.ElideRight
+          }
+        }
+
+        // Row 5: Cost
+        RowLayout {
+          spacing: Style.marginS
+
+          NText {
+            text: "Cost"
+            pointSize: Style.fontSizeS
+            color: Color.mOnSurface
+            opacity: 0.5
+            Layout.preferredWidth: 60
+          }
+
+          NText {
+            text: root.costText
+            pointSize: Style.fontSizeS
+            color: root.costText === "unknown" ? Color.mOnSurface : Color.mPrimary
+            opacity: root.costText === "unknown" ? 0.45 : 1.0
+          }
+        }
+
+        // Row 6+: Platforms
         Repeater {
           model: {
             var items = [];

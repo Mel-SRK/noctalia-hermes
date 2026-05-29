@@ -19,11 +19,15 @@ EVENT_STATES = {
     "pre_llm_call": "busy",
     "pre_tool_call": "busy",
     "on_session_start": "busy",
+    # A post event only means one API/tool step finished. The same turn may
+    # immediately continue with another tool or model call, so keep the bar in a
+    # short busy grace period instead of flashing the completed icon mid-turn.
+    "post_llm_call": "busy",
+    "post_tool_call": "busy",
     # Waiting for user interaction.
     "pre_approval_request": "attention",
-    # Work finished / user responded / lifecycle ended.
-    "post_llm_call": "idle",
-    "post_tool_call": "idle",
+    # These lifecycle/user-response events really mean the agent can return to
+    # idle from the status widget's perspective.
     "post_approval_response": "idle",
     "on_session_end": "idle",
     "on_session_finalize": "idle",

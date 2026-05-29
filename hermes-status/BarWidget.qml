@@ -23,6 +23,7 @@ Item {
 
   readonly property bool hideWhenIdle: cfg.hideWhenIdle ?? defaults.hideWhenIdle ?? false
   readonly property string status: hermesService?.status ?? "loading"
+  readonly property var usage: hermesService?.usage ?? ({})
 
   readonly property string screenName: screen ? screen.name : ""
   readonly property string barPosition: Settings.getBarPositionForScreen(screenName)
@@ -55,7 +56,31 @@ Item {
   readonly property string displayText: {
     if (status === "attention") return "!";
     if (status === "degraded") return "!";
-    return "";
+    return root.usageText;
+  }
+
+  function formatTokens(value) {
+    var n = Number(value || 0);
+    if (n >= 1000000) return (n / 1000000).toFixed(n >= 10000000 ? 0 : 1) + "M";
+    if (n >= 1000) return (n / 1000).toFixed(n >= 100000 ? 0 : 1) + "k";
+    return String(Math.round(n));
+  }
+
+  function formatCost(value) {
+    if (value === undefined || value === null) return "";
+    var n = Number(value);
+    if (!isFinite(n) || n <= 0) return "";
+    if (n < 0.0001) return "$" + n.toFixed(6);
+    if (n < 0.01) return "$" + n.toFixed(4);
+    return "$" + n.toFixed(2);
+  }
+
+  readonly property string usageText: {
+    if (!usage || !usage.available || !usage.total_tokens) return "";
+    var text = formatTokens(usage.total_tokens) + " tok";
+    var cost = formatCost(usage.actual_cost_usd ?? usage.estimated_cost_usd);
+    if (cost !== "") text += " · " + cost;
+    return text;
   }
 
   readonly property bool shouldHide: hideWhenIdle && status === "idle"
