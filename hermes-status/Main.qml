@@ -13,7 +13,7 @@ Item {
   QtObject {
     id: hermesService
 
-    // Parsed state
+    // Gateway state
     property string gatewayState: "unknown"   // "running", "stopped", "unknown"
     property int activeAgents: 0
     property var platforms: ({})
@@ -21,6 +21,26 @@ Item {
     property string updatedAt: ""
     property string errorMessage: ""
     property string fetchState: "idle"  // "idle", "loading", "success", "error"
+
+    // Attention flag (set by hook or manually)
+    property bool needsAttention: false
+
+    // Computed: overall status
+    // "offline"    — gateway stopped
+    // "idle"       — running, nothing happening
+    // "busy"       — active_agents > 0
+    // "attention"  — needs user input (approval/clarify)
+    // "degraded"   — running but platform errors
+    // "error"      — can't read state
+    readonly property string status: {
+      if (fetchState === "error") return "error";
+      if (fetchState === "loading") return "loading";
+      if (gatewayState !== "running") return "offline";
+      if (needsAttention) return "attention";
+      if (activeAgents > 0) return "busy";
+      if (hasError) return "degraded";
+      return "idle";
+    }
 
     // Derived
     property int connectedCount: {
@@ -46,16 +66,28 @@ Item {
       var cfg = pluginApi?.pluginSettings || {};
       var defaults = pluginApi?.manifest?.metadata?.defaultSettings || {};
       var filePath = cfg.gatewayStateFile ?? defaults.gatewayStateFile;
-      // Expand ~ to home
-      var home = StandardPaths.writableLocation(StandardPaths.HomeLocation);
-      filePath = filePath.replace("~", home);
 
       fetchState = "loading";
-      fetchProcess.command = ["cat", filePath];
+      fetchProcess.command = ["sh", "-c", "cat " + filePath];
       fetchProcess.running = true;
+
+      // Also check attention flag
+      var attentionPath = cfg.attentionFile ?? defaults.attentionFile;
+      attentionProcess.command = ["sh", "-c", "test -f " + attentionPath + " && echo 1 || echo 0"];
+      attentionProcess.running = true;
+    }
+
+    function clearAttention() {
+      var cfg = pluginApi?.pluginSettings || {};
+      var defaults = pluginApi?.manifest?.metadata?.defaultSettings || {};
+      var attentionPath = cfg.attentionFile ?? defaults.attentionFile;
+      clearAttentionProcess.command = ["sh", "-c", "rm -f " + attentionPath];
+      clearAttentionProcess.running = true;
+      needsAttention = false;
     }
   }
 
+  // Read gateway_state.json
   Process {
     id: fetchProcess
     stdout: StdioCollector {}
@@ -87,9 +119,25 @@ Item {
       } catch (e) {
         hermesService.fetchState = "error";
         hermesService.errorMessage = "JSON parse error: " + e;
-        Logger.e("HermesStatus", "Failed to parse state:", e);
       }
     }
+  }
+
+  // Check attention flag file
+  Process {
+    id: attentionProcess
+    stdout: StdioCollector {}
+
+    onExited: function(exitCode) {
+      var result = stdout.text ? stdout.text.trim() : "";
+      hermesService.needsAttention = (result === "1");
+    }
+  }
+
+  // Clear attention flag
+  Process {
+    id: clearAttentionProcess
+    stdout: StdioCollector {}
   }
 
   Timer {

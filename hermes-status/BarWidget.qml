@@ -15,47 +15,56 @@ Item {
   property ShellScreen screen
   property string widgetId: ""
   property string section: ""
+  property int sectionWidgetIndex: 0
+  property int sectionWidgetsCount: 1
 
   property var cfg: pluginApi?.pluginSettings || ({})
   property var defaults: pluginApi?.manifest?.metadata?.defaultSettings || ({})
 
-  readonly property string iconColorKey: cfg.iconColor ?? defaults.iconColor
-  readonly property bool hideWhenRunning: cfg.hideWhenRunning ?? defaults.hideWhenRunning
+  readonly property bool hideWhenIdle: cfg.hideWhenIdle ?? defaults.hideWhenIdle ?? false
   readonly property bool showAgentCount: (cfg.showAgentCount ?? defaults.showAgentCount) !== false
 
   readonly property string gwState: hermesService?.gatewayState ?? "unknown"
+  readonly property string status: hermesService?.status ?? "loading"
   readonly property int activeAgents: hermesService?.activeAgents ?? 0
-  readonly property string fetchState: hermesService?.fetchState ?? "idle"
   readonly property bool hasError: hermesService?.hasError ?? false
 
   readonly property string screenName: screen ? screen.name : ""
   readonly property string barPosition: Settings.getBarPositionForScreen(screenName)
-  readonly property bool isVerticalBar: barPosition === "left" || barPosition === "right"
 
+  // ── Traffic light: icon + color per status ──
   readonly property string currentIcon: {
-    if (fetchState === "loading") return "loader";
-    if (fetchState === "error") return "alert-triangle";
-    if (gwState === "stopped") return "circle-x";
-    if (gwState === "running" && hasError) return "alert-circle";
-    if (gwState === "running") return "circle-check";
-    return "help-circle";
+    switch (status) {
+      case "offline":    return "power";
+      case "idle":       return "circle-check";
+      case "busy":       return "loader";
+      case "attention":  return "bell-ringing";
+      case "degraded":   return "alert-circle";
+      case "error":      return "alert-triangle";
+      default:           return "help-circle";
+    }
   }
 
   readonly property color iconColor: {
-    if (fetchState === "error") return Color.mError;
-    if (gwState === "stopped") return Color.mError;
-    if (hasError) return Color.mWarning ?? Color.mOnSurface;
-    if (gwState === "running") return Color.mPrimary;
-    return Color.resolveColorKey(iconColorKey);
+    switch (status) {
+      case "offline":    return Color.mError;
+      case "idle":       return Color.mPrimary;
+      case "busy":       return Color.mPrimary;
+      case "attention":  return "#f59e0b";   // amber
+      case "degraded":   return "#f97316";   // orange
+      case "error":      return Color.mError;
+      default:           return Color.mOnSurface;
+    }
   }
 
   readonly property string displayText: {
     if (showAgentCount && activeAgents > 0) return activeAgents.toString();
-    if (showAgentCount && hasError) return "!";
+    if (status === "attention") return "!";
+    if (status === "degraded") return "!";
     return "";
   }
 
-  readonly property bool shouldHide: hideWhenRunning && gwState === "running" && !hasError
+  readonly property bool shouldHide: hideWhenIdle && status === "idle"
 
   implicitWidth: shouldHide ? 0 : pill.width
   implicitHeight: shouldHide ? 0 : pill.height
@@ -73,6 +82,10 @@ Item {
 
     onClicked: {
       if (pluginApi) {
+        // Clear attention flag on click
+        if (hermesService && hermesService.needsAttention) {
+          hermesService.clearAttention();
+        }
         pluginApi.openPanel(root.screen, root);
       }
     }
@@ -92,9 +105,9 @@ Item {
         "icon": "refresh"
       },
       {
-        "label": pluginApi?.tr("menu.open-hermes") ?? "Open Hermes",
-        "action": "open-terminal",
-        "icon": "terminal"
+        "label": pluginApi?.tr("menu.clear-attention") ?? "Clear Attention",
+        "action": "clear-attention",
+        "icon": "bell-off"
       },
       {
         "label": pluginApi?.tr("menu.settings") ?? "Settings",
@@ -108,10 +121,8 @@ Item {
       PanelService.closeContextMenu(screen);
       if (action === "refresh") {
         hermesService?.refresh();
-      } else if (action === "open-terminal") {
-        // Open a terminal with hermes chat
-        var cfg = pluginApi?.pluginSettings || {};
-        ProcessManager.startDetached(["sh", "-c", "$TERMINAL -e hermes gateway status &"]);
+      } else if (action === "clear-attention") {
+        hermesService?.clearAttention();
       } else if (action === "settings") {
         BarService.openPluginSettings(root.screen, pluginApi.manifest);
       }

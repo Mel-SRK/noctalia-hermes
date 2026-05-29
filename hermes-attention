@@ -1,0 +1,34 @@
+#!/bin/bash
+# hermes-attention — set/clear the attention flag for noctalia-hermes plugin
+#
+# Usage:
+#   hermes-attention set    # mark "needs user input" (yellow bell)
+#   hermes-attention clear  # dismiss (back to normal)
+#   hermes-attention status # check current flag
+#
+# The noctalia plugin reads ~/.hermes/needs_attention to show the
+# yellow "Needs You" state in the status bar.
+
+FLAG_FILE="${HERMES_ATTENTION_FILE:-$HOME/.hermes/needs_attention}"
+
+case "${1:-status}" in
+  set)
+    date -Iseconds > "$FLAG_FILE"
+    echo "Attention flag set"
+    ;;
+  clear)
+    rm -f "$FLAG_FILE"
+    echo "Attention flag cleared"
+    ;;
+  status)
+    if [ -f "$FLAG_FILE" ]; then
+      echo "ACTIVE (since $(cat "$FLAG_FILE"))"
+    else
+      echo "inactive"
+    fi
+    ;;
+  *)
+    echo "Usage: hermes-attention {set|clear|status}"
+    exit 1
+    ;;
+esac

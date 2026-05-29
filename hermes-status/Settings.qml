@@ -34,6 +34,28 @@ ColumnLayout {
     }
   }
 
+  // attentionFile
+  ColumnLayout {
+    Layout.fillWidth: true
+    spacing: Style.marginXS
+
+    NText {
+      text: pluginApi?.tr("settings.attentionFile") ?? "Attention flag file"
+      font.pixelSize: Style.fontSizeS
+      font.weight: Font.DemiBold
+      color: Color.mOnSurface
+    }
+
+    NTextInput {
+      Layout.fillWidth: true
+      text: cfg.attentionFile ?? pluginApi?.manifest?.metadata?.defaultSettings?.attentionFile ?? ""
+      placeholderText: "~/.hermes/needs_attention"
+      onEditingFinished: {
+        pluginApi.setPluginSetting("attentionFile", text);
+      }
+    }
+  }
+
   // pollInterval
   ColumnLayout {
     Layout.fillWidth: true
@@ -57,50 +79,25 @@ ColumnLayout {
     }
   }
 
-  // hideWhenRunning
+  // hideWhenIdle
   NSettingSwitch {
     Layout.fillWidth: true
-    label: pluginApi?.tr("settings.hideWhenRunning") ?? "Hide when gateway is running"
-    description: pluginApi?.tr("settings.hideWhenRunningDesc") ?? "Only show the widget when gateway is stopped or has errors"
-    checked: cfg.hideWhenRunning ?? pluginApi?.manifest?.metadata?.defaultSettings?.hideWhenRunning ?? false
+    label: pluginApi?.tr("settings.hideWhenIdle") ?? "Hide when idle"
+    description: pluginApi?.tr("settings.hideWhenIdleDesc") ?? "Only show when gateway is offline, busy, or needs attention"
+    checked: cfg.hideWhenIdle ?? pluginApi?.manifest?.metadata?.defaultSettings?.hideWhenIdle ?? false
     onToggled: function(checked) {
-      pluginApi.setPluginSetting("hideWhenRunning", checked);
+      pluginApi.setPluginSetting("hideWhenIdle", checked);
     }
   }
 
   // showAgentCount
   NSettingSwitch {
     Layout.fillWidth: true
-    label: pluginApi?.tr("settings.showAgentCount") ?? "Show active agent count"
-    description: pluginApi?.tr("settings.showAgentCountDesc") ?? "Display the number of active sessions next to the icon"
+    label: pluginApi?.tr("settings.showAgentCount") ?? "Show active session count"
+    description: pluginApi?.tr("settings.showAgentCountDesc") ?? "Display the number of active sessions when busy"
     checked: cfg.showAgentCount ?? pluginApi?.manifest?.metadata?.defaultSettings?.showAgentCount ?? true
     onToggled: function(checked) {
       pluginApi.setPluginSetting("showAgentCount", checked);
-    }
-  }
-
-  // iconColor
-  ColumnLayout {
-    Layout.fillWidth: true
-    spacing: Style.marginXS
-
-    NText {
-      text: pluginApi?.tr("settings.iconColor") ?? "Icon color"
-      font.pixelSize: Style.fontSizeS
-      font.weight: Font.DemiBold
-      color: Color.mOnSurface
-    }
-
-    NComboBox {
-      Layout.fillWidth: true
-      model: ["primary", "secondary", "tertiary", "error"]
-      currentIndex: {
-        var key = cfg.iconColor ?? pluginApi?.manifest?.metadata?.defaultSettings?.iconColor ?? "primary";
-        return model.indexOf(key);
-      }
-      onCurrentValueChanged: {
-        pluginApi.setPluginSetting("iconColor", currentValue);
-      }
     }
   }
 }

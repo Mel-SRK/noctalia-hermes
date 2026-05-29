@@ -13,6 +13,7 @@ Item {
   property ShellScreen screen
   property real contentWidth: 320
 
+  readonly property string status: hermesService?.status ?? "unknown"
   readonly property string gwState: hermesService?.gatewayState ?? "unknown"
   readonly property int activeAgents: hermesService?.activeAgents ?? 0
   readonly property var platforms: hermesService?.platforms ?? ({})
@@ -20,19 +21,43 @@ Item {
   readonly property string updatedAt: hermesService?.updatedAt ?? ""
   readonly property string fetchState: hermesService?.fetchState ?? "idle"
   readonly property string errorMessage: hermesService?.errorMessage ?? ""
+  readonly property bool needsAttention: hermesService?.needsAttention ?? false
+
+  readonly property string statusLabel: {
+    switch (status) {
+      case "offline":    return "● Offline";
+      case "idle":       return "● Online";
+      case "busy":       return "● Busy";
+      case "attention":  return "● Needs You";
+      case "degraded":   return "● Degraded";
+      case "error":      return "● Error";
+      default:           return "● Unknown";
+    }
+  }
+
+  readonly property color statusColor: {
+    switch (status) {
+      case "offline":    return Color.mError;
+      case "idle":       return Color.mPrimary;
+      case "busy":       return Color.mPrimary;
+      case "attention":  return "#f59e0b";
+      case "degraded":   return "#f97316";
+      case "error":      return Color.mError;
+      default:           return Color.mOnSurface;
+    }
+  }
 
   ColumnLayout {
     anchors.fill: parent
     spacing: Style.marginM
 
-    // Header
+    // ── Header ──
     RowLayout {
       Layout.fillWidth: true
       spacing: Style.marginS
 
       NText {
         text: "⚕ Hermes Agent"
-        font.family: Style.fontFamily
         font.weight: Font.Bold
         font.pixelSize: Style.fontSizeL
         color: Color.mOnSurface
@@ -41,9 +66,9 @@ Item {
       Item { Layout.fillWidth: true }
 
       NText {
-        text: gwState === "running" ? "● Online" : gwState === "stopped" ? "● Offline" : "● Unknown"
+        text: root.statusLabel
         font.pixelSize: Style.fontSizeS
-        color: gwState === "running" ? Color.mPrimary : Color.mError
+        color: root.statusColor
       }
     }
 
@@ -51,20 +76,19 @@ Item {
     Rectangle {
       Layout.fillWidth: true
       Layout.preferredHeight: 1
-      color: Color.mOutlineVariant ?? Color.mOutline
+      color: Color.mOutline
       opacity: 0.3
     }
 
-    // Error message
+    // ── Error banner ──
     Rectangle {
       Layout.fillWidth: true
       visible: fetchState === "error"
       radius: Style.radiusS
-      color: Color.mErrorContainer ?? Qt.rgba(1, 0, 0, 0.1)
-      height: visible ? errorRow.height + Style.marginS * 2 : 0
+      height: visible ? errRow.height + Style.marginS * 2 : 0
 
       RowLayout {
-        id: errorRow
+        id: errRow
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.margins: Style.marginS
@@ -73,27 +97,31 @@ Item {
         NText {
           text: "⚠ " + root.errorMessage
           font.pixelSize: Style.fontSizeS
-          color: Color.mOnErrorContainer ?? Color.mError
+          color: Color.mError
           Layout.fillWidth: true
           wrapMode: Text.Wrap
         }
       }
     }
 
-    // Info grid
+    // ── Status detail rows ──
     ColumnLayout {
       Layout.fillWidth: true
       spacing: Style.marginXS
 
-      // Model info (read from config if available)
       Repeater {
         model: {
           var rows = [];
-          if (root.gwState !== "unknown") {
-            rows.push({"label": "Gateway", "value": root.gwState === "running" ? "Running (PID " + root.pid + ")" : "Stopped"});
+          if (gwState === "running") {
+            rows.push({ "label": "Gateway", "value": "Running (PID " + pid + ")" });
+          } else if (gwState === "stopped") {
+            rows.push({ "label": "Gateway", "value": "Stopped" });
           }
-          if (root.activeAgents > 0) {
-            rows.push({"label": "Active Sessions", "value": root.activeAgents.toString()});
+          if (activeAgents > 0) {
+            rows.push({ "label": "Sessions", "value": activeAgents + " active" });
+          }
+          if (needsAttention) {
+            rows.push({ "label": "Status", "value": "Waiting for your input" });
           }
           return rows;
         }
@@ -105,9 +133,9 @@ Item {
           NText {
             text: modelData.label
             font.pixelSize: Style.fontSizeS
-            color: Color.mOnSurfaceVariant ?? Color.mOnSurface
-            opacity: 0.7
-            Layout.preferredWidth: 110
+            color: Color.mOnSurface
+            opacity: 0.6
+            Layout.preferredWidth: 80
           }
 
           NText {
@@ -120,7 +148,7 @@ Item {
       }
     }
 
-    // Platform status
+    // ── Platforms ──
     ColumnLayout {
       Layout.fillWidth: true
       spacing: Style.marginXS
@@ -166,9 +194,9 @@ Item {
           }
 
           NText {
-            text: modelData.state === "connected" ? "Connected" : modelData.error || modelData.state
-            font.pixelSize: Style.fontSizeXS ?? Style.fontSizeS
-            color: modelData.state === "connected" ? (Color.mOnSurfaceVariant ?? Color.mOnSurface) : Color.mError
+            text: modelData.state === "connected" ? "Connected" : (modelData.error || modelData.state)
+            font.pixelSize: Style.fontSizeS
+            color: modelData.state === "connected" ? Color.mOnSurface : Color.mError
             Layout.fillWidth: true
             elide: Text.ElideRight
           }
@@ -176,24 +204,36 @@ Item {
       }
     }
 
-    // Actions
+    // ── Actions ──
     RowLayout {
       Layout.fillWidth: true
-      spacing: Style.marginS
+      spacing: Style.marginM
 
       Item { Layout.fillWidth: true }
 
+      // Clear attention
+      NText {
+        text: "🔕 Dismiss"
+        font.pixelSize: Style.fontSizeS
+        color: root.needsAttention ? Color.mOnSurface : "transparent"
+        visible: root.needsAttention
+
+        MouseArea {
+          anchors.fill: parent
+          cursorShape: Qt.PointingHandCursor
+          onClicked: hermesService?.clearAttention()
+        }
+      }
+
+      // Refresh
       NText {
         text: "↻ Refresh"
         font.pixelSize: Style.fontSizeS
         color: Color.mPrimary
-        opacity: refreshMouse.containsMouse ? 1.0 : 0.8
 
         MouseArea {
-          id: refreshMouse
           anchors.fill: parent
           cursorShape: Qt.PointingHandCursor
-          hoverEnabled: true
           onClicked: hermesService?.refresh()
         }
       }
@@ -203,10 +243,10 @@ Item {
     NText {
       Layout.fillWidth: true
       horizontalAlignment: Text.AlignRight
-      text: root.updatedAt ? "Updated: " + Qt.formatDateTime(new Date(root.updatedAt), "hh:mm:ss") : ""
-      font.pixelSize: Style.fontSizeXS ?? 10
-      color: Color.mOnSurfaceVariant ?? Color.mOnSurface
-      opacity: 0.5
+      text: updatedAt ? "Updated: " + Qt.formatDateTime(new Date(updatedAt), "hh:mm:ss") : ""
+      font.pixelSize: 10
+      color: Color.mOnSurface
+      opacity: 0.4
     }
   }
 }
