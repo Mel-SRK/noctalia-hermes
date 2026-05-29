@@ -26,7 +26,6 @@ Item {
     property string cliPid: ""
     property bool cliActive: false
     property bool needsAttention: false
-    property int activeAgents: 0
     property var platforms: ({})
     property string fetchState: "idle"
     property string errorMessage: ""
@@ -120,7 +119,6 @@ Item {
         hermesService.cliPid = data.cli_pid || "";
         hermesService.cliActive = data.cli_active || false;
         hermesService.needsAttention = data.needs_attention || false;
-        hermesService.activeAgents = data.active_agents || 0;
         hermesService.platforms = data.platforms || {};
         hermesService.signalEvent = data.signal_event || "";
         hermesService.signalTs = data.signal_ts || "";

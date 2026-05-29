@@ -97,11 +97,6 @@ def main() -> int:
     platforms = gateway_state.get("platforms", {}) if isinstance(gateway_state, dict) else {}
     if not isinstance(platforms, dict):
         platforms = {}
-    try:
-        active_agents = int(gateway_state.get("active_agents", 0)) if isinstance(gateway_state, dict) else 0
-    except Exception:
-        active_agents = 0
-
     status = "idle" if (gateway_running or cli_active) else "offline"
 
     if signal_state and signal_state != "idle":
@@ -123,7 +118,6 @@ def main() -> int:
         "cli_active": cli_active,
         "cli_pid": cli_pid,
         "needs_attention": needs_attention,
-        "active_agents": active_agents,
         "signal_event": signal_event,
         "signal_ts": signal_ts,
         "signal_age": signal_age,

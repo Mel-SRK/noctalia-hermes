@@ -22,10 +22,7 @@ Item {
   property var defaults: pluginApi?.manifest?.metadata?.defaultSettings || ({})
 
   readonly property bool hideWhenIdle: cfg.hideWhenIdle ?? defaults.hideWhenIdle ?? false
-  readonly property bool showAgentCount: (cfg.showAgentCount ?? defaults.showAgentCount) !== false
-
   readonly property string status: hermesService?.status ?? "loading"
-  readonly property int activeAgents: hermesService?.activeAgents ?? 0
 
   readonly property string screenName: screen ? screen.name : ""
   readonly property string barPosition: Settings.getBarPositionForScreen(screenName)
@@ -56,7 +53,6 @@ Item {
   }
 
   readonly property string displayText: {
-    if (showAgentCount && activeAgents > 0) return activeAgents.toString();
     if (status === "attention") return "!";
     if (status === "degraded") return "!";
     return "";

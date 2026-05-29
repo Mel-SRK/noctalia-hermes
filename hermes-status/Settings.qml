@@ -90,16 +90,4 @@ ColumnLayout {
     }
     defaultValue: pluginApi?.manifest?.metadata?.defaultSettings?.hideWhenIdle ?? false
   }
-
-  // showAgentCount
-  NToggle {
-    Layout.fillWidth: true
-    label: pluginApi?.tr("settings.showAgentCount") ?? "Show session indicator"
-    description: pluginApi?.tr("settings.showAgentCountDesc") ?? "Show a number badge when sessions are active"
-    checked: cfg.showAgentCount ?? pluginApi?.manifest?.metadata?.defaultSettings?.showAgentCount ?? true
-    onToggled: checked => {
-      pluginApi.setPluginSetting("showAgentCount", checked);
-    }
-    defaultValue: pluginApi?.manifest?.metadata?.defaultSettings?.showAgentCount ?? true
-  }
 }
