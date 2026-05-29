@@ -24,10 +24,8 @@ Item {
   readonly property bool hideWhenIdle: cfg.hideWhenIdle ?? defaults.hideWhenIdle ?? false
   readonly property bool showAgentCount: (cfg.showAgentCount ?? defaults.showAgentCount) !== false
 
-  readonly property string gwState: hermesService?.gatewayState ?? "unknown"
   readonly property string status: hermesService?.status ?? "loading"
   readonly property int activeAgents: hermesService?.activeAgents ?? 0
-  readonly property bool hasError: hermesService?.hasError ?? false
 
   readonly property string screenName: screen ? screen.name : ""
   readonly property string barPosition: Settings.getBarPositionForScreen(screenName)
@@ -50,8 +48,8 @@ Item {
       case "offline":    return Color.mError;
       case "idle":       return Color.mPrimary;
       case "busy":       return Color.mPrimary;
-      case "attention":  return "#f59e0b";   // amber
-      case "degraded":   return "#f97316";   // orange
+      case "attention":  return "#f59e0b";
+      case "degraded":   return "#f97316";
       case "error":      return Color.mError;
       default:           return Color.mOnSurface;
     }
@@ -82,7 +80,6 @@ Item {
 
     onClicked: {
       if (pluginApi) {
-        // Clear attention flag on click
         if (hermesService && hermesService.needsAttention) {
           hermesService.clearAttention();
         }

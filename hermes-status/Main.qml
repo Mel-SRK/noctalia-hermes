@@ -10,27 +10,25 @@ Item {
   // Expose service to bar widget
   property alias hermesService: hermesService
 
-  // Path to the status check script
+  // Path to the status check script (~ is expanded by sh)
   readonly property string scriptPath: {
     var cfg = pluginApi?.pluginSettings || {};
     var defaults = pluginApi?.manifest?.metadata?.defaultSettings || {};
-    var p = cfg.statusScript ?? defaults.statusScript ?? "~/.config/noctalia/plugins/hermes-status/../hermes-status-check";
-    return p.replace("~", "/home/srk");
+    return cfg.statusScript ?? defaults.statusScript ?? "~/.config/noctalia/hermes-status-check";
   }
 
   QtObject {
     id: hermesService
 
-    property string status: "idle"       // offline|idle|busy|attention|degraded|error|loading
+    property string status: "idle"
     property string gatewayPid: ""
     property string cliPid: ""
     property bool cliActive: false
-    property bool cliBusy: false
     property bool needsAttention: false
     property int activeAgents: 0
     property var platforms: ({})
-   property string fetchState: "idle"
-   property string errorMessage: ""
+    property string fetchState: "idle"
+    property string errorMessage: ""
     property string signalEvent: ""
     property string signalTs: ""
 
@@ -43,13 +41,14 @@ Item {
 
     function refresh() {
       fetchState = "loading";
+      // sh -c expands ~ to home directory
       statusProcess.command = ["sh", "-c", root.scriptPath];
       statusProcess.running = true;
     }
 
     function clearAttention() {
       needsAttention = false;
-      clearAttentionProcess.command = ["sh", "-c", "rm -f /home/srk/.hermes/needs_attention"];
+      clearAttentionProcess.command = ["sh", "-c", "rm -f ~/.hermes/needs_attention"];
       clearAttentionProcess.running = true;
     }
   }
@@ -81,7 +80,6 @@ Item {
         hermesService.gatewayPid = data.gateway_pid || "";
         hermesService.cliPid = data.cli_pid || "";
         hermesService.cliActive = data.cli_active || false;
-        hermesService.cliBusy = data.cli_busy || false;
         hermesService.needsAttention = data.needs_attention || false;
         hermesService.activeAgents = data.active_agents || 0;
         hermesService.platforms = data.platforms || {};
@@ -103,7 +101,7 @@ Item {
     stdout: StdioCollector {}
   }
 
-  // Poll timer — runs independently of pluginApi
+  // Poll timer
   Timer {
     id: pollTimer
     repeat: true
