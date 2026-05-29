@@ -272,37 +272,6 @@ Item {
           }
         }
       }
-
-      // ── Actions ──
-      RowLayout {
-        Layout.fillWidth: true
-        spacing: Style.marginS
-
-        // Dismiss attention
-        NIconButton {
-          icon: "bell-off"
-          visible: root.needsAttention
-          baseSize: Style.baseWidgetSize * 0.8
-          onClicked: hermesService?.clearAttention()
-          NText {
-            anchors.left: parent.right
-            anchors.leftMargin: 4
-            anchors.verticalCenter: parent.verticalCenter
-            text: "Dismiss"
-            pointSize: Style.fontSizeXS
-            color: Color.mOnSurface
-          }
-        }
-
-        Item { Layout.fillWidth: true }
-
-        // Refresh
-        NIconButton {
-          icon: "refresh"
-          baseSize: Style.baseWidgetSize * 0.8
-          onClicked: hermesService?.refresh()
-        }
-      }
     }
   }
 }
