@@ -108,11 +108,6 @@ Item {
         "label": pluginApi?.tr("menu.clear-attention") ?? "Clear Attention",
         "action": "clear-attention",
         "icon": "bell-off"
-      },
-      {
-        "label": pluginApi?.tr("menu.settings") ?? "Settings",
-        "action": "settings",
-        "icon": "settings"
       }
     ]
 
@@ -123,8 +118,6 @@ Item {
         hermesService?.refresh();
       } else if (action === "clear-attention") {
         hermesService?.clearAttention();
-      } else if (action === "settings") {
-        BarService.openPluginSettings(root.screen, pluginApi.manifest);
       }
     }
   }
