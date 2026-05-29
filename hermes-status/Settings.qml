@@ -80,24 +80,26 @@ ColumnLayout {
   }
 
   // hideWhenIdle
-  NSettingSwitch {
+  NToggle {
     Layout.fillWidth: true
     label: pluginApi?.tr("settings.hideWhenIdle") ?? "Hide when idle"
     description: pluginApi?.tr("settings.hideWhenIdleDesc") ?? "Only show when gateway is offline, busy, or needs attention"
     checked: cfg.hideWhenIdle ?? pluginApi?.manifest?.metadata?.defaultSettings?.hideWhenIdle ?? false
-    onToggled: function(checked) {
+    onToggled: checked => {
       pluginApi.setPluginSetting("hideWhenIdle", checked);
     }
+    defaultValue: pluginApi?.manifest?.metadata?.defaultSettings?.hideWhenIdle ?? false
   }
 
   // showAgentCount
-  NSettingSwitch {
+  NToggle {
     Layout.fillWidth: true
     label: pluginApi?.tr("settings.showAgentCount") ?? "Show active session count"
     description: pluginApi?.tr("settings.showAgentCountDesc") ?? "Display the number of active sessions when busy"
     checked: cfg.showAgentCount ?? pluginApi?.manifest?.metadata?.defaultSettings?.showAgentCount ?? true
-    onToggled: function(checked) {
+    onToggled: checked => {
       pluginApi.setPluginSetting("showAgentCount", checked);
     }
+    defaultValue: pluginApi?.manifest?.metadata?.defaultSettings?.showAgentCount ?? true
   }
 }
