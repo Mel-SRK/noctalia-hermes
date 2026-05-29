@@ -15,15 +15,15 @@ HERMES_DIR = Path(os.environ.get("HERMES_DIR", HOME / ".hermes")).expanduser()
 SIGNAL_FILE = Path(os.environ.get("HERMES_STATUS_SIGNAL", HERMES_DIR / "status_signal")).expanduser()
 
 EVENT_STATES = {
-    # Active work / recent activity.
+    # Active work starts.
     "pre_llm_call": "busy",
-    "post_llm_call": "busy",
     "pre_tool_call": "busy",
-    "post_tool_call": "busy",
     "on_session_start": "busy",
     # Waiting for user interaction.
     "pre_approval_request": "attention",
-    # User responded / lifecycle ended.
+    # Work finished / user responded / lifecycle ended.
+    "post_llm_call": "idle",
+    "post_tool_call": "idle",
     "post_approval_response": "idle",
     "on_session_end": "idle",
     "on_session_finalize": "idle",
