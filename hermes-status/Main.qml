@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import Quickshell.Io
 import qs.Commons
 
@@ -48,9 +49,47 @@ Item {
 
     function clearAttention() {
       needsAttention = false;
-      clearAttentionProcess.command = ["sh", "-c", "rm -f ~/.hermes/needs_attention"];
+      clearAttentionProcess.command = ["rm", "-f", Quickshell.env("HOME") + "/.hermes/needs_attention"];
       clearAttentionProcess.running = true;
     }
+  }
+
+  function expandHome(path) {
+    if (!path) return path;
+    if (path === "~") return Quickshell.env("HOME") || path;
+    if (path.indexOf("~/") === 0) return (Quickshell.env("HOME") || "") + path.slice(1);
+    return path;
+  }
+
+  readonly property string signalFilePath: {
+    var cfg = pluginApi?.pluginSettings || {};
+    var defaults = pluginApi?.manifest?.metadata?.defaultSettings || {};
+    return expandHome(cfg.signalFile ?? defaults.signalFile ?? "~/.hermes/status_signal");
+  }
+
+  // Watch the hook signal file for near-instant UI refresh.  The timer below is
+  // still kept as a low-frequency safety net for process/gateway changes that do
+  // not rewrite status_signal.
+  FileView {
+    id: signalFileView
+    path: root.signalFilePath
+    printErrors: false
+    watchChanges: true
+
+    onFileChanged: {
+      reload();
+      refreshDebounce.restart();
+    }
+
+    onLoaded: refreshDebounce.restart()
+    onLoadFailed: refreshDebounce.restart()
+  }
+
+  Timer {
+    id: refreshDebounce
+    interval: 100
+    repeat: false
+    onTriggered: hermesService.refresh()
   }
 
   // Status check process

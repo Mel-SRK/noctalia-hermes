@@ -48,11 +48,33 @@ ColumnLayout {
 
     NSpinBox {
       Layout.fillWidth: true
-      from: 2
-      to: 60
-      value: cfg.pollInterval ?? pluginApi?.manifest?.metadata?.defaultSettings?.pollInterval ?? 5
+      from: 5
+      to: 300
+      value: cfg.pollInterval ?? pluginApi?.manifest?.metadata?.defaultSettings?.pollInterval ?? 30
       onValueModified: {
         pluginApi.setPluginSetting("pollInterval", value);
+      }
+    }
+  }
+
+  // signalFile
+  ColumnLayout {
+    Layout.fillWidth: true
+    spacing: Style.marginXS
+
+    NText {
+      text: pluginApi?.tr("settings.signalFile") ?? "Signal file"
+      font.pixelSize: Style.fontSizeS
+      font.weight: Font.DemiBold
+      color: Color.mOnSurface
+    }
+
+    NTextInput {
+      Layout.fillWidth: true
+      text: cfg.signalFile ?? pluginApi?.manifest?.metadata?.defaultSettings?.signalFile ?? ""
+      placeholderText: "~/.hermes/status_signal"
+      onEditingFinished: {
+        pluginApi.setPluginSetting("signalFile", text);
       }
     }
   }

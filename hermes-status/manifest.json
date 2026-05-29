@@ -19,7 +19,8 @@
   "metadata": {
     "defaultSettings": {
       "statusScript": "~/.config/noctalia/hermes-status-check",
-      "pollInterval": 5,
+      "pollInterval": 30,
+      "signalFile": "~/.hermes/status_signal",
       "hideWhenIdle": false,
       "showAgentCount": true
     }

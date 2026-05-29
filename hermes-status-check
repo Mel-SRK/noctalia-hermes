@@ -1,138 +1,137 @@
-#!/bin/bash
-# hermes-status-check — detect Hermes Agent status via hooks + process checks
-# Outputs JSON with status, CLI state, gateway state, platform info
-#
-# Priority: hook signal > process detection > gateway state
+#!/usr/bin/env python3
+"""hermes-status-check — emit Hermes Agent status as JSON for noctalia-hermes.
 
-SIGNAL_FILE="${HOME}/.hermes/status_signal"
-STATE_FILE="${HOME}/.hermes/gateway_state.json"
-ATTENTION_FILE="${HOME}/.hermes/needs_attention"
+This script is intentionally self-contained and fast: it reads Hermes' status
+files once, scans /proc once, then prints a single JSON object.
+"""
 
-# 1. Check gateway process
-GW_RUNNING=false
-GW_PID=""
-if pgrep -f "hermes_cli.*gateway run" > /dev/null 2>&1; then
-  GW_RUNNING=true
-  GW_PID=$(pgrep -f "hermes_cli.*gateway run" | head -1)
-fi
+from __future__ import annotations
 
-# 2. Check CLI session
-CLI_ACTIVE=false
-CLI_PID=""
-CLI_PID=$(ps -eo pid,tty,args --no-headers 2>/dev/null \
-  | grep "hermes_cli.main" \
-  | grep -v "gateway" \
-  | grep -E "pts/" \
-  | awk '{print $1}' | head -1)
-
-if [ -n "$CLI_PID" ]; then
-  CLI_ACTIVE=true
-fi
-
-# 3. Read hook signal file (primary source of truth)
-SIGNAL_STATE=""
-SIGNAL_EVENT=""
-SIGNAL_TS=""
-if [ -f "$SIGNAL_FILE" ]; then
-  SIGNAL_STATE=$(python3 -c "
 import json
-try:
-    d = json.load(open('$SIGNAL_FILE'))
-    print(d.get('state', ''))
-except: print('')
-" 2>/dev/null)
-  SIGNAL_EVENT=$(python3 -c "
-import json
-try:
-    d = json.load(open('$SIGNAL_FILE'))
-    print(d.get('event', ''))
-except: print('')
-" 2>/dev/null)
-  SIGNAL_TS=$(python3 -c "
-import json
-try:
-    d = json.load(open('$SIGNAL_FILE'))
-    print(d.get('ts', ''))
-except: print('')
-" 2>/dev/null)
+import os
+import time
+from datetime import datetime
+from pathlib import Path
 
-  # Check if signal is stale (> 30 seconds old) — treat as idle
-  if [ -n "$SIGNAL_TS" ]; then
-    NOW=$(date +%s)
-    SIG_EPOCH=$(date -d "$SIGNAL_TS" +%s 2>/dev/null)
-    if [ -n "$SIG_EPOCH" ]; then
-      AGE=$((NOW - SIG_EPOCH))
-      if [ "$AGE" -gt 30 ]; then
-        SIGNAL_STATE="idle"
-      fi
-    fi
-  fi
-fi
+HOME = Path(os.environ.get("HOME", "~")).expanduser()
+HERMES_DIR = Path(os.environ.get("HERMES_DIR", HOME / ".hermes")).expanduser()
+SIGNAL_FILE = Path(os.environ.get("HERMES_STATUS_SIGNAL", HERMES_DIR / "status_signal")).expanduser()
+STATE_FILE = Path(os.environ.get("HERMES_GATEWAY_STATE", HERMES_DIR / "gateway_state.json")).expanduser()
+ATTENTION_FILE = Path(os.environ.get("HERMES_ATTENTION_FILE", HERMES_DIR / "needs_attention")).expanduser()
 
-# 4. Check attention flag
-NEEDS_ATTENTION=false
-[ -f "$ATTENTION_FILE" ] && NEEDS_ATTENTION=true
+BUSY_TTL_SECONDS = int(os.environ.get("HERMES_STATUS_BUSY_TTL", "30"))
 
-# 5. Read platform info from gateway_state.json
-PLATFORMS="{}"
-ACTIVE_AGENTS=0
-if [ -f "$STATE_FILE" ]; then
-  PLATFORMS=$(python3 -c "
-import json
-try:
-    d = json.load(open('$STATE_FILE'))
-    print(json.dumps(d.get('platforms', {})))
-except: print('{}')
-" 2>/dev/null)
-  ACTIVE_AGENTS=$(python3 -c "
-import json
-try:
-    d = json.load(open('$STATE_FILE'))
-    print(d.get('active_agents', 0))
-except: print(0)
-" 2>/dev/null)
-fi
 
-# 6. Determine overall status (priority order)
-STATUS="offline"
-if $GW_RUNNING || $CLI_ACTIVE; then
-  STATUS="idle"
-fi
+def read_json(path: Path, fallback):
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return fallback
 
-# Hook signal takes priority
-if [ -n "$SIGNAL_STATE" ] && [ "$SIGNAL_STATE" != "idle" ]; then
-  STATUS="$SIGNAL_STATE"
-fi
 
-# Attention flag overrides (but not offline)
-if $NEEDS_ATTENTION && [ "$STATUS" != "offline" ]; then
-  STATUS="attention"
-fi
+def parse_epoch(value: str | None) -> float | None:
+    if not value:
+        return None
+    try:
+        # date -Iseconds writes e.g. 2026-05-29T14:50:51+08:00.
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+    except Exception:
+        return None
 
-# Check platform degradation
-if [ "$STATUS" = "idle" ]; then
-  echo "$PLATFORMS" | python3 -c "
-import json, sys
-d = json.loads(sys.stdin.read())
-for k,v in d.items():
-    if isinstance(v, dict) and v.get('state') != 'connected':
-        sys.exit(0)
-sys.exit(1)
-" 2>/dev/null && STATUS="degraded"
-fi
 
-# 7. Output JSON
-cat <<EOF
-{
-  "status": "$STATUS",
-  "gateway_running": $GW_RUNNING,
-  "gateway_pid": "$GW_PID",
-  "cli_active": $CLI_ACTIVE,
-  "cli_pid": "$CLI_PID",
-  "needs_attention": $NEEDS_ATTENTION,
-  "active_agents": $ACTIVE_AGENTS,
-  "signal_event": "$SIGNAL_EVENT",
-  "signal_ts": "$SIGNAL_TS",
-  "platforms": $PLATFORMS
-}
-EOF
+def scan_processes() -> tuple[bool, str, bool, str]:
+    gateway_running = False
+    gateway_pid = ""
+    cli_active = False
+    cli_pid = ""
+
+    proc = Path("/proc")
+    for entry in proc.iterdir():
+        if not entry.name.isdigit():
+            continue
+        pid = entry.name
+        try:
+            raw = (entry / "cmdline").read_bytes()
+        except Exception:
+            continue
+        if not raw:
+            continue
+        parts = [p.decode("utf-8", "ignore") for p in raw.split(b"\0") if p]
+        cmd = " ".join(parts)
+        if "hermes_cli.main" not in cmd:
+            continue
+
+        is_gateway = "gateway" in parts and "run" in parts
+        if is_gateway and not gateway_running:
+            gateway_running = True
+            gateway_pid = pid
+        elif not is_gateway and not cli_active:
+            cli_active = True
+            cli_pid = pid
+
+        if gateway_running and cli_active:
+            break
+
+    return gateway_running, gateway_pid, cli_active, cli_pid
+
+
+def main() -> int:
+    gateway_running, gateway_pid, cli_active, cli_pid = scan_processes()
+
+    signal = read_json(SIGNAL_FILE, {})
+    signal_state = str(signal.get("state") or "")
+    signal_event = str(signal.get("event") or "")
+    signal_ts = str(signal.get("ts") or "")
+
+    signal_epoch = parse_epoch(signal_ts)
+    signal_age = None
+    if signal_epoch is not None:
+        signal_age = max(0, int(time.time() - signal_epoch))
+        if signal_age > BUSY_TTL_SECONDS and signal_state == "busy":
+            signal_state = "idle"
+
+    needs_attention = ATTENTION_FILE.exists()
+
+    gateway_state = read_json(STATE_FILE, {})
+    platforms = gateway_state.get("platforms", {}) if isinstance(gateway_state, dict) else {}
+    if not isinstance(platforms, dict):
+        platforms = {}
+    try:
+        active_agents = int(gateway_state.get("active_agents", 0)) if isinstance(gateway_state, dict) else 0
+    except Exception:
+        active_agents = 0
+
+    status = "idle" if (gateway_running or cli_active) else "offline"
+
+    if signal_state and signal_state != "idle":
+        status = signal_state
+
+    if needs_attention and status != "offline":
+        status = "attention"
+
+    if status == "idle":
+        for value in platforms.values():
+            if isinstance(value, dict) and value.get("state") != "connected":
+                status = "degraded"
+                break
+
+    out = {
+        "status": status,
+        "gateway_running": gateway_running,
+        "gateway_pid": gateway_pid,
+        "cli_active": cli_active,
+        "cli_pid": cli_pid,
+        "needs_attention": needs_attention,
+        "active_agents": active_agents,
+        "signal_event": signal_event,
+        "signal_ts": signal_ts,
+        "signal_age": signal_age,
+        "platforms": platforms,
+    }
+    print(json.dumps(out, ensure_ascii=False, separators=(",", ":")))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,34 +1,62 @@
-#!/bin/bash
-# hermes-status-hook — called by hermes shell hooks to write status signal
-# Usage: hermes-status-hook <event> [extra_args...]
-#
-# Writes to ~/.hermes/status_signal with JSON:
-#   {"state": "busy|attention|idle", "event": "pre_tool_call", "ts": "..."}
+#!/usr/bin/env python3
+"""hermes-status-hook — write Hermes lifecycle status for noctalia-hermes."""
 
-SIGNAL_FILE="${HOME}/.hermes/status_signal"
-EVENT="$1"
+from __future__ import annotations
 
-case "$EVENT" in
-  # Processing states → busy
-  pre_llm_call|post_llm_call|pre_tool_call|post_tool_call|on_session_start)
-    STATE="busy"
-    ;;
-  # Waiting for user → attention
-  pre_approval_request)
-    STATE="attention"
-    ;;
-  # User responded / session ended → idle
-  post_approval_response|on_session_end|on_session_finalize|on_session_reset)
-    STATE="idle"
-    ;;
-  *)
-    STATE="busy"
-    ;;
-esac
+import json
+import os
+import sys
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
 
-# Write atomically via temp file
-TMPFILE="${SIGNAL_FILE}.tmp.$$"
-cat > "$TMPFILE" <<EOF
-{"state":"${STATE}","event":"${EVENT}","ts":"$(date -Iseconds)"}
-EOF
-mv -f "$TMPFILE" "$SIGNAL_FILE"
+HOME = Path(os.environ.get("HOME", "~")).expanduser()
+HERMES_DIR = Path(os.environ.get("HERMES_DIR", HOME / ".hermes")).expanduser()
+SIGNAL_FILE = Path(os.environ.get("HERMES_STATUS_SIGNAL", HERMES_DIR / "status_signal")).expanduser()
+
+EVENT_STATES = {
+    # Active work / recent activity.
+    "pre_llm_call": "busy",
+    "post_llm_call": "busy",
+    "pre_tool_call": "busy",
+    "post_tool_call": "busy",
+    "on_session_start": "busy",
+    # Waiting for user interaction.
+    "pre_approval_request": "attention",
+    # User responded / lifecycle ended.
+    "post_approval_response": "idle",
+    "on_session_end": "idle",
+    "on_session_finalize": "idle",
+    "on_session_reset": "idle",
+}
+
+
+def main(argv: list[str]) -> int:
+    event = argv[1] if len(argv) > 1 else "unknown"
+    state = EVENT_STATES.get(event, "busy")
+
+    payload = {
+        "state": state,
+        "event": event,
+        "ts": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
+    }
+
+    SIGNAL_FILE.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{SIGNAL_FILE.name}.", suffix=".tmp", dir=str(SIGNAL_FILE.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
+            f.write("\n")
+        os.replace(tmp_name, SIGNAL_FILE)
+    except Exception:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))
