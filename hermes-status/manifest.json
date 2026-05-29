@@ -1,0 +1,28 @@
+{
+  "id": "hermes-status",
+  "name": "Hermes Agent",
+  "version": "1.0.0",
+  "author": "srk",
+  "official": false,
+  "license": "MIT",
+  "description": "Shows Hermes Agent gateway status in the bar",
+  "tags": ["Bar", "System", "AI"],
+  "entryPoints": {
+    "main": "Main.qml",
+    "barWidget": "BarWidget.qml",
+    "panel": "Panel.qml",
+    "settings": "Settings.qml"
+  },
+  "dependencies": {
+    "plugins": []
+  },
+  "metadata": {
+    "defaultSettings": {
+      "gatewayStateFile": "~/.hermes/gateway_state.json",
+      "pollInterval": 10,
+      "iconColor": "primary",
+      "hideWhenRunning": false,
+      "showAgentCount": true
+    }
+  }
+}
