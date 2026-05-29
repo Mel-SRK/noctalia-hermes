@@ -1,11 +1,11 @@
 {
   "id": "hermes-status",
   "name": "Hermes Agent",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "srk",
   "official": false,
   "license": "MIT",
-  "description": "Traffic-light status indicator for Hermes Agent gateway",
+  "description": "Traffic-light status indicator for Hermes Agent (CLI + Gateway)",
   "tags": ["Bar", "System", "AI"],
   "entryPoints": {
     "main": "Main.qml",
@@ -18,9 +18,8 @@
   },
   "metadata": {
     "defaultSettings": {
-      "gatewayStateFile": "~/.hermes/gateway_state.json",
-      "attentionFile": "~/.hermes/needs_attention",
-      "pollInterval": 10,
+      "statusScript": "~/.config/noctalia/hermes-status-check",
+      "pollInterval": 5,
       "hideWhenIdle": false,
       "showAgentCount": true
     }

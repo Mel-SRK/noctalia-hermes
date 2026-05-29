@@ -10,31 +10,27 @@ Item {
   // Expose service to bar widget
   property alias hermesService: hermesService
 
+  // Path to the status check script
+  readonly property string scriptPath: {
+    var cfg = pluginApi?.pluginSettings || {};
+    var defaults = pluginApi?.manifest?.metadata?.defaultSettings || {};
+    var p = cfg.statusScript ?? defaults.statusScript ?? "~/.config/noctalia/plugins/hermes-status/../hermes-status-check";
+    return p.replace("~", "/home/srk");
+  }
+
   QtObject {
     id: hermesService
 
-    // Gateway state
-    property string gatewayState: "unknown"
+    property string status: "idle"       // offline|idle|busy|attention|degraded|error|loading
+    property string gatewayPid: ""
+    property string cliPid: ""
+    property bool cliActive: false
+    property bool cliBusy: false
+    property bool needsAttention: false
     property int activeAgents: 0
     property var platforms: ({})
-    property string pid: ""
-    property string updatedAt: ""
-    property string errorMessage: ""
     property string fetchState: "idle"
-
-    // Attention flag
-    property bool needsAttention: false
-
-    // Overall status
-    readonly property string status: {
-      if (fetchState === "error") return "error";
-      if (fetchState === "loading") return "loading";
-      if (gatewayState !== "running") return "offline";
-      if (needsAttention) return "attention";
-      if (activeAgents > 0) return "busy";
-      if (hasError) return "degraded";
-      return "idle";
-    }
+    property string errorMessage: ""
 
     property bool hasError: {
       for (var key in platforms) {
@@ -43,103 +39,57 @@ Item {
       return false;
     }
 
-    function parseState(text) {
-      try {
-        var data = JSON.parse(text);
-        gatewayState = data.gateway_state || "unknown";
-        activeAgents = data.active_agents || 0;
-        platforms = data.platforms || {};
-        pid = data.pid ? data.pid.toString() : "";
-        updatedAt = data.updated_at || "";
-        fetchState = "success";
-        errorMessage = "";
-      } catch (e) {
-        fetchState = "error";
-        errorMessage = "JSON parse error: " + e;
-      }
+    function refresh() {
+      fetchState = "loading";
+      statusProcess.command = ["sh", "-c", root.scriptPath];
+      statusProcess.running = true;
     }
 
     function clearAttention() {
       needsAttention = false;
-      var cfg = pluginApi?.pluginSettings || {};
-      var defaults = pluginApi?.manifest?.metadata?.defaultSettings || {};
-      var path = cfg.attentionFile ?? defaults.attentionFile;
-      clearAttentionProcess.command = ["sh", "-c", "rm -f " + path];
+      clearAttentionProcess.command = ["sh", "-c", "rm -f /home/srk/.hermes/needs_attention"];
       clearAttentionProcess.running = true;
     }
   }
 
-  // ── Watch gateway_state.json via FileView ──
-  property string stateFilePath: {
-    var cfg = pluginApi?.pluginSettings || {};
-    var defaults = pluginApi?.manifest?.metadata?.defaultSettings || {};
-    var f = cfg.gatewayStateFile ?? defaults.gatewayStateFile ?? "~/.hermes/gateway_state.json";
-    return "file://" + f.replace("~", Qt.resolvedUrl("~").toString().replace("file://", "").replace("/~", ""));
-  }
+  // Status check process
+  Process {
+    id: statusProcess
+    stdout: StdioCollector {}
 
-  FileView {
-    id: stateFileView
-    path: {
-      var cfg = pluginApi?.pluginSettings || {};
-      var defaults = pluginApi?.manifest?.metadata?.defaultSettings || {};
-      var f = cfg.gatewayStateFile ?? defaults.gatewayStateFile ?? "~/.hermes/gateway_state.json";
-      return "file://" + f.replace("~", "/home/srk");
-    }
-    watchChanges: true
-    printErrors: false
-
-    onFileChanged: {
-      reload();
-    }
-
-    onLoaded: {
-      var content = text();
-      if (content && content.trim() !== "") {
-        hermesService.parseState(content);
-      } else {
+    onExited: function(exitCode) {
+      if (exitCode !== 0) {
         hermesService.fetchState = "error";
-        hermesService.errorMessage = "Empty state file";
+        hermesService.status = "error";
+        hermesService.errorMessage = "Script failed (exit " + exitCode + ")";
+        return;
       }
-    }
-  }
 
-  // ── Watch attention flag file ──
-  FileView {
-    id: attentionFileView
-    path: {
-      var cfg = pluginApi?.pluginSettings || {};
-      var defaults = pluginApi?.manifest?.metadata?.defaultSettings || {};
-      var f = cfg.attentionFile ?? defaults.attentionFile ?? "~/.hermes/needs_attention";
-      return "file://" + f.replace("~", "/home/srk");
-    }
-    watchChanges: true
-    printErrors: false
+      var response = stdout.text;
+      if (!response || response.trim() === "") {
+        hermesService.fetchState = "error";
+        hermesService.status = "error";
+        hermesService.errorMessage = "Empty response";
+        return;
+      }
 
-    onFileChanged: {
-      reload();
-    }
-
-    onLoaded: {
-      hermesService.needsAttention = true;
-    }
-  }
-
-  // ── Polling fallback (in case file watching doesn't trigger) ──
-  Timer {
-    id: pollTimer
-    repeat: true
-    running: pluginApi !== null
-    triggeredOnStart: true
-    interval: {
-      var cfg = pluginApi?.pluginSettings || {};
-      var defaults = pluginApi?.manifest?.metadata?.defaultSettings || {};
-      var secs = cfg.pollInterval ?? defaults.pollInterval ?? 10;
-      return secs * 1000;
-    }
-    onTriggered: {
-      // Force reload both files
-      stateFileView.reload();
-      attentionFileView.reload();
+      try {
+        var data = JSON.parse(response);
+        hermesService.status = data.status || "unknown";
+        hermesService.gatewayPid = data.gateway_pid || "";
+        hermesService.cliPid = data.cli_pid || "";
+        hermesService.cliActive = data.cli_active || false;
+        hermesService.cliBusy = data.cli_busy || false;
+        hermesService.needsAttention = data.needs_attention || false;
+        hermesService.activeAgents = data.active_agents || 0;
+        hermesService.platforms = data.platforms || {};
+        hermesService.fetchState = "success";
+        hermesService.errorMessage = "";
+      } catch (e) {
+        hermesService.fetchState = "error";
+        hermesService.status = "error";
+        hermesService.errorMessage = "JSON parse error: " + e;
+      }
     }
   }
 
@@ -149,11 +99,25 @@ Item {
     stdout: StdioCollector {}
   }
 
+  // Poll timer — runs independently of pluginApi
+  Timer {
+    id: pollTimer
+    repeat: true
+    running: true
+    triggeredOnStart: true
+    interval: {
+      var cfg = pluginApi?.pluginSettings || {};
+      var defaults = pluginApi?.manifest?.metadata?.defaultSettings || {};
+      var secs = cfg.pollInterval ?? defaults.pollInterval ?? 10;
+      return secs * 1000;
+    }
+    onTriggered: hermesService.refresh()
+  }
+
   IpcHandler {
     target: "plugin:hermes-status"
     function refresh() {
-      stateFileView.reload();
-      attentionFileView.reload();
+      hermesService.refresh();
     }
     function toggle() {
       if (pluginApi) {

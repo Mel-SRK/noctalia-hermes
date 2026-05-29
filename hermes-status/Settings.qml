@@ -12,13 +12,13 @@ ColumnLayout {
 
   spacing: Style.marginM
 
-  // gatewayStateFile
+  // statusScript
   ColumnLayout {
     Layout.fillWidth: true
     spacing: Style.marginXS
 
     NText {
-      text: pluginApi?.tr("settings.stateFile") ?? "Gateway state file"
+      text: pluginApi?.tr("settings.statusScript") ?? "Status check script"
       font.pixelSize: Style.fontSizeS
       font.weight: Font.DemiBold
       color: Color.mOnSurface
@@ -26,32 +26,10 @@ ColumnLayout {
 
     NTextInput {
       Layout.fillWidth: true
-      text: cfg.gatewayStateFile ?? pluginApi?.manifest?.metadata?.defaultSettings?.gatewayStateFile ?? ""
-      placeholderText: "~/.hermes/gateway_state.json"
+      text: cfg.statusScript ?? pluginApi?.manifest?.metadata?.defaultSettings?.statusScript ?? ""
+      placeholderText: "~/.config/noctalia/hermes-status-check"
       onEditingFinished: {
-        pluginApi.setPluginSetting("gatewayStateFile", text);
-      }
-    }
-  }
-
-  // attentionFile
-  ColumnLayout {
-    Layout.fillWidth: true
-    spacing: Style.marginXS
-
-    NText {
-      text: pluginApi?.tr("settings.attentionFile") ?? "Attention flag file"
-      font.pixelSize: Style.fontSizeS
-      font.weight: Font.DemiBold
-      color: Color.mOnSurface
-    }
-
-    NTextInput {
-      Layout.fillWidth: true
-      text: cfg.attentionFile ?? pluginApi?.manifest?.metadata?.defaultSettings?.attentionFile ?? ""
-      placeholderText: "~/.hermes/needs_attention"
-      onEditingFinished: {
-        pluginApi.setPluginSetting("attentionFile", text);
+        pluginApi.setPluginSetting("statusScript", text);
       }
     }
   }
@@ -70,9 +48,9 @@ ColumnLayout {
 
     NSpinBox {
       Layout.fillWidth: true
-      from: 3
-      to: 120
-      value: cfg.pollInterval ?? pluginApi?.manifest?.metadata?.defaultSettings?.pollInterval ?? 10
+      from: 2
+      to: 60
+      value: cfg.pollInterval ?? pluginApi?.manifest?.metadata?.defaultSettings?.pollInterval ?? 5
       onValueModified: {
         pluginApi.setPluginSetting("pollInterval", value);
       }
@@ -94,8 +72,8 @@ ColumnLayout {
   // showAgentCount
   NToggle {
     Layout.fillWidth: true
-    label: pluginApi?.tr("settings.showAgentCount") ?? "Show active session count"
-    description: pluginApi?.tr("settings.showAgentCountDesc") ?? "Display the number of active sessions when busy"
+    label: pluginApi?.tr("settings.showAgentCount") ?? "Show session indicator"
+    description: pluginApi?.tr("settings.showAgentCountDesc") ?? "Show a number badge when sessions are active"
     checked: cfg.showAgentCount ?? pluginApi?.manifest?.metadata?.defaultSettings?.showAgentCount ?? true
     onToggled: checked => {
       pluginApi.setPluginSetting("showAgentCount", checked);

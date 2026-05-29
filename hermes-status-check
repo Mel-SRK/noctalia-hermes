@@ -1,0 +1,97 @@
+#!/bin/bash
+# hermes-status-check — detect Hermes Agent local status
+# Outputs JSON with gateway state, CLI state, platform status
+#
+# States: offline | idle | busy | attention | degraded
+
+STATE_FILE="${HOME}/.hermes/gateway_state.json"
+ATTENTION_FILE="${HOME}/.hermes/needs_attention"
+
+# 1. Check gateway process
+GW_RUNNING=false
+GW_PID=""
+if pgrep -f "hermes_cli.*gateway run" > /dev/null 2>&1; then
+  GW_RUNNING=true
+  GW_PID=$(pgrep -f "hermes_cli.*gateway run" | head -1)
+fi
+
+# 2. Check CLI session
+CLI_ACTIVE=false
+CLI_PID=""
+CLI_BUSY=false
+# Look for hermes_cli.main running on a terminal (not gateway)
+CLI_PID=$(ps -eo pid,tty,comm,args --no-headers 2>/dev/null \
+  | grep "hermes_cli.main" \
+  | grep -v "gateway" \
+  | grep -E "pts/" \
+  | awk '{print $1}' | head -1)
+
+if [ -n "$CLI_PID" ]; then
+  CLI_ACTIVE=true
+  # Check CPU usage — high = processing, low = waiting for input
+  CPU=$(ps -p "$CLI_PID" -o %cpu= 2>/dev/null | tr -d ' ')
+  if [ -n "$CPU" ]; then
+    # If CPU > 5%, consider it busy
+    BUSY=$(echo "$CPU > 5" | bc 2>/dev/null)
+    [ "$BUSY" = "1" ] && CLI_BUSY=true
+  fi
+fi
+
+# 3. Check attention flag
+NEEDS_ATTENTION=false
+[ -f "$ATTENTION_FILE" ] && NEEDS_ATTENTION=true
+
+# 4. Read gateway_state.json for platform info
+PLATFORMS="{}"
+ACTIVE_AGENTS=0
+if [ -f "$STATE_FILE" ]; then
+  PLATFORMS=$(python3 -c "
+import json, sys
+try:
+    d = json.load(open('$STATE_FILE'))
+    print(json.dumps(d.get('platforms', {})))
+except: print('{}')
+" 2>/dev/null)
+  ACTIVE_AGENTS=$(python3 -c "
+import json
+try:
+    d = json.load(open('$STATE_FILE'))
+    print(d.get('active_agents', 0))
+except: print(0)
+" 2>/dev/null)
+fi
+
+# 5. Determine overall status
+STATUS="offline"
+if $GW_RUNNING; then
+  STATUS="idle"
+  if $NEEDS_ATTENTION; then
+    STATUS="attention"
+  elif $CLI_BUSY || [ "$ACTIVE_AGENTS" -gt 0 ] 2>/dev/null; then
+    STATUS="busy"
+  elif echo "$PLATFORMS" | python3 -c "
+import json, sys
+d = json.loads(sys.stdin.read())
+for k,v in d.items():
+    if isinstance(v, dict) and v.get('state') != 'connected':
+        sys.exit(0)
+sys.exit(1)
+" 2>/dev/null; then
+    STATUS="degraded"
+  fi
+fi
+
+# 6. Output JSON
+cat <<EOF
+{
+  "status": "$STATUS",
+  "gateway_running": $GW_RUNNING,
+  "gateway_pid": "$GW_PID",
+  "cli_active": $CLI_ACTIVE,
+  "cli_pid": "$CLI_PID",
+  "cli_busy": $CLI_BUSY,
+  "needs_attention": $NEEDS_ATTENTION,
+  "active_agents": $ACTIVE_AGENTS,
+  "platforms": $PLATFORMS
+}
+EOF

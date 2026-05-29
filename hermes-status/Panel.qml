@@ -14,14 +14,15 @@ Item {
   property real contentWidth: 320
 
   readonly property string status: hermesService?.status ?? "unknown"
-  readonly property string gwState: hermesService?.gatewayState ?? "unknown"
-  readonly property int activeAgents: hermesService?.activeAgents ?? 0
+  readonly property bool cliActive: hermesService?.cliActive ?? false
+  readonly property bool cliBusy: hermesService?.cliBusy ?? false
+  readonly property string cliPid: hermesService?.cliPid ?? ""
+  readonly property string gatewayPid: hermesService?.gatewayPid ?? ""
   readonly property var platforms: hermesService?.platforms ?? ({})
-  readonly property string pid: hermesService?.pid ?? ""
-  readonly property string updatedAt: hermesService?.updatedAt ?? ""
+  readonly property int activeAgents: hermesService?.activeAgents ?? 0
+  readonly property bool needsAttention: hermesService?.needsAttention ?? false
   readonly property string fetchState: hermesService?.fetchState ?? "idle"
   readonly property string errorMessage: hermesService?.errorMessage ?? ""
-  readonly property bool needsAttention: hermesService?.needsAttention ?? false
 
   readonly property string statusLabel: {
     switch (status) {
@@ -51,7 +52,7 @@ Item {
     anchors.fill: parent
     spacing: Style.marginM
 
-    // ── Header ──
+    // Header
     RowLayout {
       Layout.fillWidth: true
       spacing: Style.marginS
@@ -72,7 +73,6 @@ Item {
       }
     }
 
-    // Separator
     Rectangle {
       Layout.fillWidth: true
       Layout.preferredHeight: 1
@@ -80,7 +80,7 @@ Item {
       opacity: 0.3
     }
 
-    // ── Error banner ──
+    // Error banner
     Rectangle {
       Layout.fillWidth: true
       visible: fetchState === "error"
@@ -104,7 +104,7 @@ Item {
       }
     }
 
-    // ── Status detail rows ──
+    // Info rows
     ColumnLayout {
       Layout.fillWidth: true
       spacing: Style.marginXS
@@ -112,11 +112,8 @@ Item {
       Repeater {
         model: {
           var rows = [];
-          if (gwState === "running") {
-            rows.push({ "label": "Gateway", "value": "Running (PID " + pid + ")" });
-          } else if (gwState === "stopped") {
-            rows.push({ "label": "Gateway", "value": "Stopped" });
-          }
+          rows.push({ "label": "Gateway", "value": gatewayPid ? "Running (PID " + gatewayPid + ")" : "Stopped" });
+          rows.push({ "label": "CLI Session", "value": cliActive ? (cliBusy ? "Processing..." : "Active (PID " + cliPid + ")") : "None" });
           if (activeAgents > 0) {
             rows.push({ "label": "Sessions", "value": activeAgents + " active" });
           }
@@ -135,7 +132,7 @@ Item {
             font.pixelSize: Style.fontSizeS
             color: Color.mOnSurface
             opacity: 0.6
-            Layout.preferredWidth: 80
+            Layout.preferredWidth: 90
           }
 
           NText {
@@ -148,7 +145,7 @@ Item {
       }
     }
 
-    // ── Platforms ──
+    // Platforms
     ColumnLayout {
       Layout.fillWidth: true
       spacing: Style.marginXS
@@ -204,14 +201,13 @@ Item {
       }
     }
 
-    // ── Actions ──
+    // Actions
     RowLayout {
       Layout.fillWidth: true
       spacing: Style.marginM
 
       Item { Layout.fillWidth: true }
 
-      // Clear attention
       NText {
         text: "🔕 Dismiss"
         font.pixelSize: Style.fontSizeS
@@ -225,7 +221,6 @@ Item {
         }
       }
 
-      // Refresh
       NText {
         text: "↻ Refresh"
         font.pixelSize: Style.fontSizeS
@@ -237,16 +232,6 @@ Item {
           onClicked: hermesService?.refresh()
         }
       }
-    }
-
-    // Footer timestamp
-    NText {
-      Layout.fillWidth: true
-      horizontalAlignment: Text.AlignRight
-      text: updatedAt ? "Updated: " + Qt.formatDateTime(new Date(updatedAt), "hh:mm:ss") : ""
-      font.pixelSize: 10
-      color: Color.mOnSurface
-      opacity: 0.4
     }
   }
 }
