@@ -83,7 +83,7 @@ Item {
       var cfg = pluginApi?.pluginSettings || {};
       var defaults = pluginApi?.manifest?.metadata?.defaultSettings || {};
       var f = cfg.gatewayStateFile ?? defaults.gatewayStateFile ?? "~/.hermes/gateway_state.json";
-      return f.replace("~", "/home/srk");
+      return "file://" + f.replace("~", "/home/srk");
     }
     watchChanges: true
     printErrors: false
@@ -110,7 +110,7 @@ Item {
       var cfg = pluginApi?.pluginSettings || {};
       var defaults = pluginApi?.manifest?.metadata?.defaultSettings || {};
       var f = cfg.attentionFile ?? defaults.attentionFile ?? "~/.hermes/needs_attention";
-      return f.replace("~", "/home/srk");
+      return "file://" + f.replace("~", "/home/srk");
     }
     watchChanges: true
     printErrors: false
