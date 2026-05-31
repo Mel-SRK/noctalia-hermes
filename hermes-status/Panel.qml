@@ -67,7 +67,9 @@ Item {
       "post_tool_call": "Tool done",
       "pre_approval_request": "Awaiting approval",
       "on_session_start": "Started",
-      "on_session_end": "Ended"
+      "on_session_end": "Ended",
+      "on_session_finalize": "Finalizing",
+      "on_session_reset": "Reset"
     };
     return map[signalEvent] || "";
   }

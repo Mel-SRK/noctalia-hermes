@@ -21,8 +21,6 @@ STATE_FILE = Path(os.environ.get("HERMES_GATEWAY_STATE", HERMES_DIR / "gateway_s
 ATTENTION_FILE = Path(os.environ.get("HERMES_ATTENTION_FILE", HERMES_DIR / "needs_attention")).expanduser()
 STATE_DB = Path(os.environ.get("HERMES_STATE_DB", HERMES_DIR / "state.db")).expanduser()
 
-BUSY_TTL_SECONDS = int(os.environ.get("HERMES_STATUS_BUSY_TTL", "12"))
-
 
 def read_json(path: Path, fallback):
     try:
@@ -200,8 +198,13 @@ def main() -> int:
     signal_age = None
     if signal_epoch is not None:
         signal_age = max(0, int(time.time() - signal_epoch))
-        if signal_age > BUSY_TTL_SECONDS and signal_state == "busy":
-            signal_state = "idle"
+
+    # Safety net: if the signal says "busy" but the CLI process is gone and
+    # the signal hasn't been refreshed in 60 s, the session likely crashed
+    # without firing on_session_end.  Fall back to process-based status.
+    STALE_BUSY_GRACE = 60
+    if signal_state == "busy" and not cli_active and (signal_age is not None) and signal_age > STALE_BUSY_GRACE:
+        signal_state = ""
 
     needs_attention = ATTENTION_FILE.exists()
 
