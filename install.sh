@@ -4,7 +4,7 @@ set -euo pipefail
 repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 plugin_src="$repo_dir/hermes-status"
 plugin_dst="$HOME/.config/noctalia/plugins/hermes-status"
-check_dst="$HOME/.config/noctalia/hermes-status-check"
+check_dst="$HOME/.cache/noctalia/plugins/hermes-status/hermes-status-check"
 hook_dst="$HOME/.local/bin/hermes-status-hook"
 attention_dst="$HOME/.local/bin/hermes-attention"
 
@@ -13,7 +13,7 @@ if [[ ! -d "$plugin_src" ]]; then
   exit 1
 fi
 
-mkdir -p "$HOME/.config/noctalia/plugins" "$HOME/.config/noctalia" "$HOME/.local/bin"
+mkdir -p "$HOME/.config/noctalia/plugins" "$HOME/.cache/noctalia/plugins/hermes-status" "$HOME/.local/bin"
 
 ln -sfn "$plugin_src" "$plugin_dst"
 install -m 755 "$repo_dir/hermes-status-check" "$check_dst"

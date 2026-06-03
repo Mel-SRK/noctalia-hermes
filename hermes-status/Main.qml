@@ -15,7 +15,7 @@ Item {
   readonly property string scriptPath: {
     var cfg = pluginApi?.pluginSettings || {};
     var defaults = pluginApi?.manifest?.metadata?.defaultSettings || {};
-    return cfg.statusScript ?? defaults.statusScript ?? "~/.config/noctalia/hermes-status-check";
+    return cfg.statusScript ?? defaults.statusScript ?? "~/.cache/noctalia/plugins/hermes-status/hermes-status-check";
   }
 
   QtObject {

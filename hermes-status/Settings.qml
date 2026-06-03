@@ -27,7 +27,7 @@ ColumnLayout {
     NTextInput {
       Layout.fillWidth: true
       text: cfg.statusScript ?? pluginApi?.manifest?.metadata?.defaultSettings?.statusScript ?? ""
-      placeholderText: "~/.config/noctalia/hermes-status-check"
+      placeholderText: "~/.cache/noctalia/plugins/hermes-status/hermes-status-check"
       onEditingFinished: {
         pluginApi.setPluginSetting("statusScript", text);
       }
